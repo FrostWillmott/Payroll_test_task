@@ -14,7 +14,7 @@ A command-line tool for generating payroll reports from CSV files containing emp
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/payroll-test-task.git
+git clone https://github.com/frostwillmott/payroll-test-task.git
 cd payroll-test-task
 ```
 
