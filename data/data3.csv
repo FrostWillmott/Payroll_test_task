@@ -1,0 +1,4 @@
+department,id,name,email,hours_worked,salary
+Finance,7,Grace Wilson,grace@example.com,150,80
+HR,8,Henry Taylor,henry@example.com,130,45
+Finance,9,Ivy Clark,ivy@example.com,170,75

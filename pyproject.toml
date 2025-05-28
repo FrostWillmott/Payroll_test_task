@@ -1,0 +1,21 @@
+[project]
+name = "payroll-test-task"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "FrostWillmott",email = "121764288+FrostWillmott@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+ruff = "^0.11.11"
+
