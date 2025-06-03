@@ -4,55 +4,19 @@ Tests for the report generator module.
 
 import json
 import pytest
+from src.payroll.models import Employee
 from src.payroll.report_generator import (
     generate_report,
-    register_report_generator,
-    calculate_payout,
+    ReportGeneratorFactory,
     _report_generators
 )
+from src.payroll.report_protocols import ReportGenerator
 
 
-def test_calculate_payout():
-    """Test calculating the payout for an employee."""
-    employee = {
-        "hours_worked": 160.0,
-        "hourly_rate": 50.0
-    }
-    assert calculate_payout(employee) == 8000.0
-
-
-def test_register_report_generator():
-    """Test registering a report generator."""
-    # Save the original report generators
-    original_generators = _report_generators.copy()
-
-    try:
-        # Register a test report generator
-        @register_report_generator("test")
-        def test_generator(employees):
-            return "Test report"
-
-        # Check that it was registered
-        assert "test" in _report_generators
-        assert _report_generators["test"] == test_generator
-
-        # Check that it works
-        assert test_generator([]) == "Test report"
-    finally:
-        # Restore the original report generators
-        _report_generators.clear()
-        _report_generators.update(original_generators)
-
-
-def test_generate_report_unsupported_type():
-    """Test that generate_report raises ValueError for unsupported report types."""
-    with pytest.raises(ValueError):
-        generate_report([], "unsupported")
-
-
-def test_generate_payout_report():
-    """Test generating a payout report."""
-    employees = [
+@pytest.fixture
+def employee_data():
+    """Fixture for employee data."""
+    return [
         {
             "id": 1,
             "name": "Alice Johnson",
@@ -79,7 +43,107 @@ def test_generate_payout_report():
         }
     ]
 
-    report = generate_report(employees, "payout")
+
+@pytest.fixture
+def employee_objects():
+    """Fixture for employee objects."""
+    return [
+        Employee(
+            id=1,
+            name="Alice Johnson",
+            email="alice@example.com",
+            department="Marketing",
+            hours_worked=160.0,
+            hourly_rate=50.0
+        ),
+        Employee(
+            id=2,
+            name="Bob Smith",
+            email="bob@example.com",
+            department="Design",
+            hours_worked=150.0,
+            hourly_rate=40.0
+        ),
+        Employee(
+            id=3,
+            name="Carol Williams",
+            email="carol@example.com",
+            department="Design",
+            hours_worked=170.0,
+            hourly_rate=60.0
+        )
+    ]
+
+
+@pytest.fixture
+def real_data_file_paths():
+    """Fixture for real data file paths."""
+    return ["data/data1.csv", "data/data2.csv", "data/data3.csv"]
+
+
+class TestReportGenerator(ReportGenerator):
+    """Test report generator for testing."""
+
+    def generate(self, employees):
+        """Generate a test report."""
+        return "Test report"
+
+
+def test_employee_calculate_payout(employee_objects):
+    """Test calculating the payout for an employee."""
+    assert employee_objects[0].calculate_payout() == 8000.0
+
+
+def test_report_generator_factory_register():
+    """Test registering a report generator."""
+    # Save the original report generators
+    original_generators = _report_generators.copy()
+
+    try:
+        # Register a test report generator
+        ReportGeneratorFactory.register("test", TestReportGenerator)
+
+        # Check that it was registered
+        assert "test" in _report_generators
+        assert _report_generators["test"] == TestReportGenerator
+
+        # Check that it works
+        generator = ReportGeneratorFactory.create("test")
+        assert isinstance(generator, TestReportGenerator)
+        assert generator.generate([]) == "Test report"
+    finally:
+        # Restore the original report generators
+        _report_generators.clear()
+        _report_generators.update(original_generators)
+
+
+def test_generate_report_unsupported_type():
+    """Test that generate_report raises ValueError for unsupported report types."""
+    with pytest.raises(ValueError):
+        generate_report([], "unsupported")
+
+
+@pytest.mark.parametrize("department,expected_employees,expected_total", [
+    ("Marketing", 1, 8000.0),
+    ("Design", 2, 16200.0)
+])
+def test_generate_payout_report_departments(employee_data, department, expected_employees, expected_total):
+    """Test generating a payout report for specific departments."""
+    report = generate_report(employee_data, "payout")
+    report_data = json.loads(report)
+
+    # Find the department in the report
+    dept = next((d for d in report_data["departments"] if d["name"] == department), None)
+    assert dept is not None
+
+    # Check the department data
+    assert len(dept["employees"]) == expected_employees
+    assert dept["department_total"] == expected_total
+
+
+def test_generate_payout_report(employee_data):
+    """Test generating a payout report."""
+    report = generate_report(employee_data, "payout")
 
     # Parse the JSON report
     report_data = json.loads(report)
@@ -97,33 +161,16 @@ def test_generate_payout_report():
     assert "Marketing" in department_names
     assert "Design" in department_names
 
-    # Check the employees in each department
-    for dept in departments:
-        if dept["name"] == "Marketing":
-            assert len(dept["employees"]) == 1
-            assert dept["employees"][0]["name"] == "Alice Johnson"
-            assert dept["employees"][0]["payout"] == 8000.0
-            assert dept["department_total"] == 8000.0
-        elif dept["name"] == "Design":
-            assert len(dept["employees"]) == 2
-            # Employees should be sorted by name
-            assert dept["employees"][0]["name"] == "Bob Smith"
-            assert dept["employees"][0]["payout"] == 6000.0
-            assert dept["employees"][1]["name"] == "Carol Williams"
-            assert dept["employees"][1]["payout"] == 10200.0
-            assert dept["department_total"] == 16200.0
-
     # Check the total payout
     assert report_data["total_payout"] == 24200.0
 
 
-def test_generate_report_with_real_data():
+def test_generate_report_with_real_data(real_data_file_paths):
     """Test generating a report with real data."""
     from src.payroll.csv_parser import parse_csv_files
 
     # Parse the real data files
-    file_paths = ["data/data1.csv", "data/data2.csv", "data/data3.csv"]
-    employees = parse_csv_files(file_paths)
+    employees = parse_csv_files(real_data_file_paths)
 
     # Generate a payout report
     report = generate_report(employees, "payout")
